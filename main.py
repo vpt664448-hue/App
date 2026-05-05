@@ -14,7 +14,6 @@ with st.sidebar:
     sbase = st.number_input("Sbase (MVA):", value=100.0)
     
     st.subheader("1. Cost Coefficients & Limits")
-    # ទិន្នន័យដើមតាម MATLAB
     data = {
         "a": [350.0, 500.0, 600.0],
         "b": [7.2, 7.3, 7.8],
@@ -37,14 +36,13 @@ with col_b2:
     b03 = st.number_input("B03:", value=0.0001, format="%.6f")
     b00_in = st.number_input("B00:", value=0.000044, format="%.6f")
 
-# រៀបចំ Arrays សម្រាប់គណនា
+# រៀបចំ Arrays
 cost = df_input[["a", "b", "c"]].values
 limits = df_input[["Pmin", "Pmax"]].values
 B = df_b.values / sbase
 B0 = np.array([b01, b02, b03])
 B00 = b00_in * sbase
 
-# --- ចុចប៊ូតុងគណនា ---
 if st.button("🚀 គណនា (Run MATLAB Logic)", type="primary"):
     
     # --- Iteration 0 ---
@@ -53,7 +51,6 @@ if st.button("🚀 គណនា (Run MATLAB Logic)", type="primary"):
     den0 = sum(1 / (2 * cost[:,2]))
     lam = num0 / den0
     P0 = (lam - cost[:,1]) / (2 * cost[:,2])
-    
     st.write(f"**Lambda** = {lam:.9f}")
     st.write(f"**P1** = {P0[0]:.9f} MW, **P2** = {P0[1]:.9f} MW, **P3** = {P0[2]:.9f} MW")
     st.divider()
@@ -76,17 +73,15 @@ if st.button("🚀 គណនា (Run MATLAB Logic)", type="primary"):
     lam = lam + dlam1
 
     st.write(f"**P1** = {P1[0]:.9f} MW, **P2** = {P1[1]:.9f} MW, **P3** = {P1[2]:.9f} MW")
-    st.write(f"**PL** = {PL1:.9f} MW, **DP** = {DP1:.9f} MW")
-    st.write(f"**F** = {F:.9f}, **X** = {X:.9f}, **Y** = {Y:.9f}")
-    st.write(f"**Lambda** = {lam:.9f}")
+    st.write(f"**PL** = {PL1:.9f} MW, **DP** = {DP1:.9f} MW, **Lambda** = {lam:.9f}")
     st.divider()
 
     # --- Iteration 2 ---
     st.markdown("### === Iteration 2 ===")
     P2 = np.zeros(3)
     P2[0] = (lam*(1 - B0[0] - 2*(B[0,1]*P1[1] + B[0,2]*P1[2])) - cost[0,1]) / (2*(cost[0,2] + lam*B[0,0]))
-    P2[1] = (lam*(1 - B0[1] - 2*(B[2,0]*P2[0] + B[1,2]*P1[2])) - cost[1,1]) / (2*(cost[1,2] + lam*B[1,1]))
-    P2[2] = (lam*(1 - B0[2] - 2*(B[3,0]*P2[0] + B[2,1]*P2[1])) - cost[2,1]) / (2*(cost[2,2] + lam*B[2,2]))
+    P2[1] = (lam*(1 - B0[1] - 2*(B[1,0]*P2[0] + B[1,2]*P1[2])) - cost[1,1]) / (2*(cost[1,2] + lam*B[1,1]))
+    P2[2] = (lam*(1 - B0[2] - 2*(B[2,0]*P2[0] + B[2,1]*P2[1])) - cost[2,1]) / (2*(cost[2,2] + lam*B[2,2]))
 
     st.write(f"**P1** = {P2[0]:.9f}, **P2** = {P2[1]:.9f}, **P3** = {P2[2]:.9f}")
 
@@ -105,7 +100,6 @@ if st.button("🚀 គណនា (Run MATLAB Logic)", type="primary"):
 
     dlam2 = DP2 / (F2 + X2 + Y2)
     lam = lam + dlam2
-
     st.write(f"**PL** = {PL2:.9f}, **DP** = {DP2:.9f}, **Lambda** = {lam:.9f}")
     st.divider()
 
@@ -135,7 +129,6 @@ if st.button("🚀 គណនា (Run MATLAB Logic)", type="primary"):
 
     dlam3 = DP3 / (F3 + X3 + Y3)
     lam = lam + dlam3
-
     st.write(f"**PL** = {PL3:.9f}, **DP** = {DP3:.9f}, **Lambda** = {lam:.9f}")
 
     # --- Final Result ---
