@@ -5,7 +5,7 @@ import pandas as pd
 # កំណត់ទម្រង់ទំព័រ
 st.set_page_config(page_title="Economic Dispatch 3-IT Mode", layout="wide")
 
-st.title("⚡ Economic Dispatch (P-Limit Result First)")
+st.title("⚡ Economic Dispatch (Display P Before Limit)")
 st.write("អភិវឌ្ឍន៍ដោយ៖ **ផាត ប្រុសនិ (BROSNI 168)** | NTTI")
 
 # --- ផ្នែកបញ្ចូលទិន្នន័យ (Input) ---
@@ -56,24 +56,28 @@ if st.button("🚀 គណនា 3 Iterations", type="primary"):
         P_prev = P.copy()
         hit = [0, 0, 0]
         
-        # 1. គណនា P1, P2, P3 ជាមុនសិន
+        # 1. គណនា P1, P2, P3
         P[0] = (lam*(1 - B0[0] - 2*(B[0,1]*P_prev[1] + B[0,2]*P_prev[2])) - cost[0,1]) / (2*(cost[0,2] + lam*B[0,0]))
         P[1] = (lam*(1 - B0[1] - 2*(B[1,0]*P[0] + B[1,2]*P_prev[2])) - cost[1,1]) / (2*(cost[1,2] + lam*B[1,1]))
         P[2] = (lam*(1 - B0[2] - 2*(B[2,0]*P[0] + B[2,1]*P[1])) - cost[2,1]) / (2*(cost[2,2] + lam*B[2,2]))
 
-        # 2. ឆែកលក្ខខណ្ឌ Limit ចាប់ពី IT2 ឡើងទៅ (បង្ហាញចម្លើយ Limit ភ្លាមៗ)
+        # 2. បង្ហាញតម្លៃ P ដែលគណនាបានមុនឆែក Limit
+        st.write(f"**P គណនាបាន (Before Limit Check):**")
+        st.code(f"P1 = {P[0]:.9f}, P2 = {P[1]:.9f}, P3 = {P[2]:.9f}")
+
+        # 3. ឆែកលក្ខខណ្ឌ Limit ចាប់ពី IT2
         if i >= 2:
             for j in range(3):
                 if P[j] > limits[j, 1]:
-                    st.warning(f"⚠️ P{j+1} ជាប់ Limit Pmax ({limits[j, 1]})")
+                    st.warning(f"⚠️ P{j+1} ({P[j]:.6f}) ជាប់ Limit Pmax! ត្រូវកំណត់មក {limits[j, 1]}")
                     P[j] = limits[j, 1]
                     hit[j] = 1
                 elif P[j] < limits[j, 0]:
-                    st.warning(f"⚠️ P{j+1} ជាប់ Limit Pmin ({limits[j, 0]})")
+                    st.warning(f"⚠️ P{j+1} ({P[j]:.6f}) ជាប់ Limit Pmin! ត្រូវកំណត់មក {limits[j, 0]}")
                     P[j] = limits[j, 0]
                     hit[j] = 1
 
-        # 3. គណនា Loss, DP និង Gradients
+        # 4. គណនា Loss, DP និង Gradients
         PL = P @ B @ P.T + B0 @ P.T + B00
         DP = pdt + PL - sum(P)
 
@@ -83,7 +87,7 @@ if st.button("🚀 គណនា 3 Iterations", type="primary"):
 
         dlam = DP / (F + X + Y)
         
-        # 4. បង្ហាញតម្លៃ P បន្ទាប់ពីឆែក Limit រួច
+        # 5. បង្ហាញតម្លៃ P ចុងក្រោយ និងដទៃទៀត
         st.info(f"**P ចុងក្រោយក្នុង IT{i}:** P1={P[0]:.6f}, P2={P[1]:.6f}, P3={P[2]:.6f}")
         
         c1, c2, c3 = st.columns(3)
@@ -93,9 +97,8 @@ if st.button("🚀 គណនា 3 Iterations", type="primary"):
         
         st.success(f"✅ **dlam{i}** = `{dlam:.9f}` | **DP** = `{DP:.6f}`")
         
-        # 5. បូកបញ្ជូល Lambda ថ្មី
         lam = lam + dlam
-        st.write(f"**Lambda ថ្មីសម្រាប់ប្រើក្នុង IT បន្ទាប់** = `{lam:.9f}`")
+        st.write(f"**Lambda ថ្មី** = `{lam:.9f}`")
         st.divider()
 
     # --- Final Output ---
