@@ -5,7 +5,7 @@ import pandas as pd
 # កំណត់ទម្រង់ទំព័រ
 st.set_page_config(page_title="Economic Dispatch 3-IT Mode", layout="wide")
 
-st.title("⚡ Economic Dispatch (Limit Check from IT2)")
+st.title("⚡ Economic Dispatch (P-Limit Result First)")
 st.write("អភិវឌ្ឍន៍ដោយ៖ **ផាត ប្រុសនិ (BROSNI 168)** | NTTI")
 
 # --- ផ្នែកបញ្ចូលទិន្នន័យ (Input) ---
@@ -61,39 +61,41 @@ if st.button("🚀 គណនា 3 Iterations", type="primary"):
         P[1] = (lam*(1 - B0[1] - 2*(B[1,0]*P[0] + B[1,2]*P_prev[2])) - cost[1,1]) / (2*(cost[1,2] + lam*B[1,1]))
         P[2] = (lam*(1 - B0[2] - 2*(B[2,0]*P[0] + B[2,1]*P[1])) - cost[2,1]) / (2*(cost[2,2] + lam*B[2,2]))
 
-        # 2. ចាប់ផ្ដើមឆែកលក្ខខណ្ឌ Limit ចាប់ពី IT2 ឡើងទៅ
+        # 2. ឆែកលក្ខខណ្ឌ Limit ចាប់ពី IT2 ឡើងទៅ (បង្ហាញចម្លើយ Limit ភ្លាមៗ)
         if i >= 2:
             for j in range(3):
                 if P[j] > limits[j, 1]:
+                    st.warning(f"⚠️ P{j+1} ជាប់ Limit Pmax ({limits[j, 1]})")
                     P[j] = limits[j, 1]
                     hit[j] = 1
-                    st.warning(f"⚠️ P{j+1} ជាប់ Limit Pmax ({limits[j, 1]})")
                 elif P[j] < limits[j, 0]:
+                    st.warning(f"⚠️ P{j+1} ជាប់ Limit Pmin ({limits[j, 0]})")
                     P[j] = limits[j, 0]
                     hit[j] = 1
-                    st.warning(f"⚠️ P{j+1} ជាប់ Limit Pmin ({limits[j, 0]})")
 
-        # 3. គណនា Loss និង DP បន្ទាប់ពីបាន P ពេញលេញ
+        # 3. គណនា Loss, DP និង Gradients
         PL = P @ B @ P.T + B0 @ P.T + B00
         DP = pdt + PL - sum(P)
 
-        # 4. គណនា Gradients (F, X, Y) បន្ទាប់ពីរក P1, P2, P3 រួច
         F = (cost[0,2]*(1-B0[0]-2*(B[0,1]*P[1]+B[0,2]*P[2])) + B[0,0]*cost[0,1]) / (2*(cost[0,2]+lam*B[0,0])**2) if not hit[0] else 0
         X = (cost[1,2]*(1-B0[1]-2*(B[1,0]*P[0]+B[1,2]*P[2])) + B[1,1]*cost[1,1]) / (2*(cost[1,2]+lam*B[1,1])**2) if not hit[1] else 0
         Y = (cost[2,2]*(1-B0[2]-2*(B[2,0]*P[0]+B[2,1]*P[1])) + B[2,2]*cost[2,1]) / (2*(cost[2,2]+lam*B[2,2])**2) if not hit[2] else 0
 
         dlam = DP / (F + X + Y)
         
-        # បង្ហាញតម្លៃ
-        st.write(f"**P-Current:** P1={P[0]:.6f}, P2={P[1]:.6f}, P3={P[2]:.6f}")
+        # 4. បង្ហាញតម្លៃ P បន្ទាប់ពីឆែក Limit រួច
+        st.info(f"**P ចុងក្រោយក្នុង IT{i}:** P1={P[0]:.6f}, P2={P[1]:.6f}, P3={P[2]:.6f}")
+        
         c1, c2, c3 = st.columns(3)
         c1.metric("Gradient F", f"{F:.9f}")
         c2.metric("Gradient X", f"{X:.9f}")
         c3.metric("Gradient Y", f"{Y:.9f}")
         
         st.success(f"✅ **dlam{i}** = `{dlam:.9f}` | **DP** = `{DP:.6f}`")
+        
+        # 5. បូកបញ្ជូល Lambda ថ្មី
         lam = lam + dlam
-        st.info(f"**Lambda ថ្មី** = `{lam:.9f}`")
+        st.write(f"**Lambda ថ្មីសម្រាប់ប្រើក្នុង IT បន្ទាប់** = `{lam:.9f}`")
         st.divider()
 
     # --- Final Output ---
