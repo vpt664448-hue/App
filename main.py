@@ -2,8 +2,9 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-# កំណត់ទម្រង់ App
-st.set_config(page_title="Economic Dispatch MATLAB Style", layout="wide")
+# កែសម្រួលត្រង់នេះ៖ ត្រូវប្រើ set_page_config
+st.set_page_config(page_title="Economic Dispatch MATLAB Style", layout="wide")
+
 st.title("⚡ Economic Dispatch (Full Debug Mode)")
 st.write("អភិវឌ្ឍន៍ដោយ៖ **ផាត ប្រុសនិ (BROSNI 168)** | NTTI")
 
@@ -60,7 +61,11 @@ if st.button("🚀 គណនា និងបង្ហាញលទ្ធផលល
 
     dlam = DP / (F + X + Y)
     
-    st.info(f"**DEBUG:** F={F:.9f}, X={X:.9f}, Y={Y:.9f}")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("F", f"{F:.9f}")
+    col2.metric("X", f"{X:.9f}")
+    col3.metric("Y", f"{Y:.9f}")
+    
     st.success(f"**dlam1** = {dlam:.9f}")
     
     lam = lam + dlam
@@ -79,7 +84,7 @@ if st.button("🚀 គណនា និងបង្ហាញលទ្ធផលល
     if P[2] > limits[2, 1]:
         P[2] = limits[2, 1]
         hit3 = 1
-        st.warning(f"⚠️ P3 hit Pmax!")
+        st.warning(f"⚠️ P3 hit Pmax ({limits[2, 1]} MW)")
 
     PL = P @ B @ P.T + B0 @ P.T + B00
     DP = pdt + PL - sum(P)
@@ -90,7 +95,11 @@ if st.button("🚀 គណនា និងបង្ហាញលទ្ធផលល
 
     dlam = DP / (F + X + Y)
     
-    st.info(f"**DEBUG:** F={F:.9f}, X={X:.9f}, Y={Y:.9f}")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("F", f"{F:.9f}")
+    col2.metric("X", f"{X:.9f}")
+    col3.metric("Y", f"{Y:.9f}")
+    
     st.success(f"**dlam2** = {dlam:.9f}")
     
     lam = lam + dlam
