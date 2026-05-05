@@ -5,7 +5,7 @@ import pandas as pd
 # កំណត់ទម្រង់ទំព័រ
 st.set_page_config(page_title="Economic Dispatch 3-IT Mode", layout="wide")
 
-st.title("⚡ Economic Dispatch (3 Iterations + Custom B-Values)")
+st.title("⚡ Economic Dispatch (Limit Check from IT2)")
 st.write("អភិវឌ្ឍន៍ដោយ៖ **ផាត ប្រុសនិ (BROSNI 168)** | NTTI")
 
 # --- ផ្នែកបញ្ចូលទិន្នន័យ (Input) ---
@@ -47,57 +47,56 @@ if st.button("🚀 គណនា 3 Iterations", type="primary"):
     den0 = sum(1 / (2 * cost[:,2]))
     lam = num0 / den0
     P = (lam - cost[:,1]) / (2 * cost[:,2])
-    st.write(f"**Lambda** = `{lam:.9f}`")
+    st.write(f"**Lambda initial** = `{lam:.9f}`")
     st.write(f"**P1** = {P[0]:.6f}, **P2** = {P[1]:.6f}, **P3** = {P[2]:.6f}")
     st.divider()
 
-    # រង្វិលជុំសម្រាប់ 3 Iterations
     for i in range(1, 4):
         st.markdown(f"### === Iteration {i} ===")
         P_prev = P.copy()
+        hit = [0, 0, 0]
         
-        # Gauss-Seidel Update
+        # 1. គណនា P1, P2, P3 ជាមុនសិន
         P[0] = (lam*(1 - B0[0] - 2*(B[0,1]*P_prev[1] + B[0,2]*P_prev[2])) - cost[0,1]) / (2*(cost[0,2] + lam*B[0,0]))
         P[1] = (lam*(1 - B0[1] - 2*(B[1,0]*P[0] + B[1,2]*P_prev[2])) - cost[1,1]) / (2*(cost[1,2] + lam*B[1,1]))
         P[2] = (lam*(1 - B0[2] - 2*(B[2,0]*P[0] + B[2,1]*P[1])) - cost[2,1]) / (2*(cost[2,2] + lam*B[2,2]))
 
-        # Check Limits
-        hit = [0, 0, 0]
-        for j in range(3):
-            if P[j] > limits[j, 1]:
-                P[j] = limits[j, 1]
-                hit[j] = 1
-                st.warning(f"⚠️ P{j+1} hit Pmax!")
-            elif P[j] < limits[j, 0]:
-                P[j] = limits[j, 0]
-                hit[j] = 1
-                st.warning(f"⚠️ P{j+1} hit Pmin!")
+        # 2. ចាប់ផ្ដើមឆែកលក្ខខណ្ឌ Limit ចាប់ពី IT2 ឡើងទៅ
+        if i >= 2:
+            for j in range(3):
+                if P[j] > limits[j, 1]:
+                    P[j] = limits[j, 1]
+                    hit[j] = 1
+                    st.warning(f"⚠️ P{j+1} ជាប់ Limit Pmax ({limits[j, 1]})")
+                elif P[j] < limits[j, 0]:
+                    P[j] = limits[j, 0]
+                    hit[j] = 1
+                    st.warning(f"⚠️ P{j+1} ជាប់ Limit Pmin ({limits[j, 0]})")
 
-        # Calculate Loss and DP
+        # 3. គណនា Loss និង DP បន្ទាប់ពីបាន P ពេញលេញ
         PL = P @ B @ P.T + B0 @ P.T + B00
         DP = pdt + PL - sum(P)
 
-        # Calculate Gradients (F, X, Y)
+        # 4. គណនា Gradients (F, X, Y) បន្ទាប់ពីរក P1, P2, P3 រួច
         F = (cost[0,2]*(1-B0[0]-2*(B[0,1]*P[1]+B[0,2]*P[2])) + B[0,0]*cost[0,1]) / (2*(cost[0,2]+lam*B[0,0])**2) if not hit[0] else 0
         X = (cost[1,2]*(1-B0[1]-2*(B[1,0]*P[0]+B[1,2]*P[2])) + B[1,1]*cost[1,1]) / (2*(cost[1,2]+lam*B[1,1])**2) if not hit[1] else 0
         Y = (cost[2,2]*(1-B0[2]-2*(B[2,0]*P[0]+B[2,1]*P[1])) + B[2,2]*cost[2,1]) / (2*(cost[2,2]+lam*B[2,2])**2) if not hit[2] else 0
 
         dlam = DP / (F + X + Y)
         
-        # Display Metrics
+        # បង្ហាញតម្លៃ
+        st.write(f"**P-Current:** P1={P[0]:.6f}, P2={P[1]:.6f}, P3={P[2]:.6f}")
         c1, c2, c3 = st.columns(3)
-        c1.metric(f"F (IT {i})", f"{F:.9f}")
-        c2.metric(f"X (IT {i})", f"{X:.9f}")
-        c3.metric(f"Y (IT {i})", f"{Y:.9f}")
+        c1.metric("Gradient F", f"{F:.9f}")
+        c2.metric("Gradient X", f"{X:.9f}")
+        c3.metric("Gradient Y", f"{Y:.9f}")
         
-        st.success(f"✅ **dlam{i}** = `{dlam:.9f}`")
+        st.success(f"✅ **dlam{i}** = `{dlam:.9f}` | **DP** = `{DP:.6f}`")
         lam = lam + dlam
-        st.info(f"**New Lambda** = `{lam:.9f}`")
-        st.write(f"**P1** = {P[0]:.6f}, **P2** = {P[1]:.6f}, **P3** = {P[2]:.6f}")
+        st.info(f"**Lambda ថ្មី** = `{lam:.9f}`")
         st.divider()
 
-    # --- Final Result ---
-    st.subheader("🏆 Final Output")
-    total_p = sum(P)
+    # --- Final Output ---
+    st.subheader("🏆 លទ្ធផលចុងក្រោយ")
     gencost = sum(cost[:,0] + cost[:,1]*P + cost[:,2]*(P**2))
-    st.success(f"**Total Gen:** {total_p:.4f} MW | **Total Cost:** {gencost:.4f} $/h")
+    st.metric("Total Generation Cost", f"{gencost:.4f} $/h")
