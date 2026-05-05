@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 
 # កំណត់ទម្រង់ទំព័រ
-st.set_page_config(page_title="Economic Dispatch 3-IT Mode", layout="wide")
+st.set_page_config(page_title="Economic Dispatch 3-IT Full B-Matrix", layout="wide")
 
-st.title("⚡ Economic Dispatch (Display P Before Limit)")
+st.title("⚡ Economic Dispatch (Full B-Matrix & P-Limit Display)")
 st.write("អភិវឌ្ឍន៍ដោយ៖ **ផាត ប្រុសនិ (BROSNI 168)** | NTTI")
 
 # --- ផ្នែកបញ្ចូលទិន្នន័យ (Input) ---
@@ -24,15 +24,23 @@ with st.sidebar:
     }
     df_input = st.data_editor(pd.DataFrame(data))
 
-    st.subheader("2. Loss Coefficients B0i & B00")
+    st.subheader("2. Loss Coefficients B-Matrix (Bij)")
+    # កន្លែងសម្រាប់បំពេញ Bij ដូចក្នុង MATLAB
+    b_data = {
+        "Unit 1": [0.0595, 0.0006, -0.0007],
+        "Unit 2": [0.0006, 0.0055, 0.0024],
+        "Unit 3": [-0.0007, 0.0024, 0.0088]
+    }
+    df_bij = st.data_editor(pd.DataFrame(b_data, index=["Unit 1", "Unit 2", "Unit 3"]))
+
+    st.subheader("3. Coefficients B0i & B00")
     b01 = st.number_input("B01:", value=-0.0022, format="%.6f")
     b02 = st.number_input("B02:", value=0.0000, format="%.6f")
     b03 = st.number_input("B03:", value=0.0001, format="%.6f")
     b00_raw = st.number_input("B00:", value=0.000044, format="%.6f")
 
-# Matrix B (Bij)
-b_mat = [[0.0595, 0.0006, -0.0007], [0.0006, 0.0055, 0.0024], [-0.0007, 0.0024, 0.0088]]
-B = np.array(b_mat) / sbase
+# រៀបចំ Matrix B (Bij) ចេញពីតារាងដែលបំពេញ
+B = df_bij.values / sbase
 B0 = np.array([b01, b02, b03])
 B00 = b00_raw * sbase
 
@@ -56,12 +64,12 @@ if st.button("🚀 គណនា 3 Iterations", type="primary"):
         P_prev = P.copy()
         hit = [0, 0, 0]
         
-        # 1. គណនា P1, P2, P3
+        # 1. គណនា P1, P2, P3 តាម Gauss-Seidel
         P[0] = (lam*(1 - B0[0] - 2*(B[0,1]*P_prev[1] + B[0,2]*P_prev[2])) - cost[0,1]) / (2*(cost[0,2] + lam*B[0,0]))
         P[1] = (lam*(1 - B0[1] - 2*(B[1,0]*P[0] + B[1,2]*P_prev[2])) - cost[1,1]) / (2*(cost[1,2] + lam*B[1,1]))
         P[2] = (lam*(1 - B0[2] - 2*(B[2,0]*P[0] + B[2,1]*P[1])) - cost[2,1]) / (2*(cost[2,2] + lam*B[2,2]))
 
-        # 2. បង្ហាញតម្លៃ P ដែលគណនាបានមុនឆែក Limit
+        # 2. បង្ហាញតម្លៃ P មុនឆែក Limit តាមការចង់បានរបស់ប្អូន
         st.write(f"**P គណនាបាន (Before Limit Check):**")
         st.code(f"P1 = {P[0]:.9f}, P2 = {P[1]:.9f}, P3 = {P[2]:.9f}")
 
@@ -69,11 +77,11 @@ if st.button("🚀 គណនា 3 Iterations", type="primary"):
         if i >= 2:
             for j in range(3):
                 if P[j] > limits[j, 1]:
-                    st.warning(f"⚠️ P{j+1} ({P[j]:.6f}) ជាប់ Limit Pmax! ត្រូវកំណត់មក {limits[j, 1]}")
+                    st.warning(f"⚠️ P{j+1} ({P[j]:.6f}) លើស Limit Pmax! កំណត់មកត្រឹម {limits[j, 1]}")
                     P[j] = limits[j, 1]
                     hit[j] = 1
                 elif P[j] < limits[j, 0]:
-                    st.warning(f"⚠️ P{j+1} ({P[j]:.6f}) ជាប់ Limit Pmin! ត្រូវកំណត់មក {limits[j, 0]}")
+                    st.warning(f"⚠️ P{j+1} ({P[j]:.6f}) ទាបជាង Limit Pmin! កំណត់មកត្រឹម {limits[j, 0]}")
                     P[j] = limits[j, 0]
                     hit[j] = 1
 
@@ -81,13 +89,14 @@ if st.button("🚀 គណនា 3 Iterations", type="primary"):
         PL = P @ B @ P.T + B0 @ P.T + B00
         DP = pdt + PL - sum(P)
 
+        # គណនា Gradient F, X, Y (បើ Unit ណាជាប់ Limit នោះ Gradient = 0)
         F = (cost[0,2]*(1-B0[0]-2*(B[0,1]*P[1]+B[0,2]*P[2])) + B[0,0]*cost[0,1]) / (2*(cost[0,2]+lam*B[0,0])**2) if not hit[0] else 0
         X = (cost[1,2]*(1-B0[1]-2*(B[1,0]*P[0]+B[1,2]*P[2])) + B[1,1]*cost[1,1]) / (2*(cost[1,2]+lam*B[1,1])**2) if not hit[1] else 0
         Y = (cost[2,2]*(1-B0[2]-2*(B[2,0]*P[0]+B[2,1]*P[1])) + B[2,2]*cost[2,1]) / (2*(cost[2,2]+lam*B[2,2])**2) if not hit[2] else 0
 
         dlam = DP / (F + X + Y)
         
-        # 5. បង្ហាញតម្លៃ P ចុងក្រោយ និងដទៃទៀត
+        # 5. បង្ហាញលទ្ធផល IT
         st.info(f"**P ចុងក្រោយក្នុង IT{i}:** P1={P[0]:.6f}, P2={P[1]:.6f}, P3={P[2]:.6f}")
         
         c1, c2, c3 = st.columns(3)
@@ -98,7 +107,7 @@ if st.button("🚀 គណនា 3 Iterations", type="primary"):
         st.success(f"✅ **dlam{i}** = `{dlam:.9f}` | **DP** = `{DP:.6f}`")
         
         lam = lam + dlam
-        st.write(f"**Lambda ថ្មី** = `{lam:.9f}`")
+        st.write(f"**Lambda សម្រាប់ IT បន្ទាប់** = `{lam:.9f}`")
         st.divider()
 
     # --- Final Output ---
